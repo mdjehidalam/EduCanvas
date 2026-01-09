@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduCanvas Pro - PDF Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #e2e8f0; overflow: hidden; height: 100vh; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        
+        canvas { touch-action: none; }
+        
+        .pdf-page-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+
+        .pdf-page-container {
+            width: 100%;
+            max-width: 95%; 
+            aspect-ratio: 1 / 1.414;
+            background: white;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        @media (min-width: 1024px) {
+            .pdf-page-container { max-width: 800px; }
+        }
+
+        /* Teaching Mode Canvas Expansion */
+        .teaching-mode .pdf-page-container {
+            max-width: 95vw !important;
+            width: 95vw !important;
+        }
+
+        .grid-layer, .ruler-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Spacing increased by 50% (0.5 increase) */
+        /* Grid: 50px -> 75px */
+        .grid-layer {
+            background-image: 
+                linear-gradient(to right, var(--line-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--line-color) 1px, transparent 1px);
+            background-size: 75px 75px; 
+        }
+        
+        /* Ruler: 40px -> 60px */
+        .ruler-layer {
+            background-size: 100% 60px;
+            background-image: linear-gradient(to bottom, transparent 59px, var(--line-color) 59px);
+        }
+
+        .watermark-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 5;
+            user-select: none;
+        }
+
+        .watermark-text {
+            font-weight: 900;
+            font-size: clamp(2rem, 10vw, 5rem);
+            text-transform: uppercase;
+            transform: rotate(-45deg);
+            white-space: nowrap;
+        }
+
+        .watermark-image {
+            max-width: 50%;
+            max-height: 50%;
+            object-fit: contain;
+            transform: rotate(-15deg);
+        }
+
+        .page-number-overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+            z-index: 40;
+            opacity: 0.6;
+        }
+
+        .layer-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .page-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 50;
+        }
+        .pdf-page-wrapper:hover .page-actions { opacity: 1; }
+
+        .teaching-mode aside, .teaching-mode header { display: none !important; }
+        .teaching-mode main { height: 100vh; width: 100vw; }
+        .teaching-mode .page-actions { opacity: 1; margin-bottom: 2rem; }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            color: #94a3b8;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        .action-btn:hover { background: #334155; color: white; border-color: #475569; }
+
+        .tool-active { background-color: #2563eb !important; color: white !important; }
+
+        .bg-color-btn { 
+            width: 28px; 
+            height: 28px; 
+            border-radius: 8px; 
+            border: 2px solid #334155; 
+            cursor: pointer; 
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .bg-color-btn:hover { transform: scale(1.1); border-color: #4f46e5; }
+        .bg-color-btn.active { border-color: #3b82f6; outline: 2px solid #3b82f6; outline-offset: 2px; }
+
+        .color-picker-wrapper {
+            position: relative;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #334155;
+            background-image: conic-gradient(red, yellow, green, cyan, blue, magenta, red);
+        }
+        .color-picker-input {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            cursor: pointer;
+            opacity: 0;
+        }
+
+        /* Adaptive Toolbar Orientation Styles */
+        #floating-toolbar {
+            transition: transform 0.1s ease-out, padding 0.2s, background 0.2s;
+            touch-action: none;
+        }
+        #floating-toolbar.vertical {
+            flex-direction: column;
+            width: auto;
+            height: auto;
+        }
+        #floating-toolbar.vertical .toolbar-divider {
+            width: 24px;
+            height: 1px;
+            margin: 4px 0;
+        }
+        #floating-toolbar.vertical .toolbar-group {
+            flex-direction: column;
+            padding-right: 0;
+            padding-bottom: 8px;
+        }
+        #floating-toolbar.is-dragging {
+            background: rgba(15, 23, 42, 0.8);
+            cursor: grabbing;
+            scale: 1.02;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);
+        }
+
+        #teaching-exit {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: none;
+        }
+        .teaching-mode #teaching-exit { display: flex; }
+    </style>
+</head>
+<body id="app-body" class="flex flex-col lg:flex-row">
+
+    <button id="teaching-exit" onclick="toggleTeachingMode()" class="flex items-center gap-2 px-4 py-2 bg-red-600/90 hover:bg-red-500 backdrop-blur text-white rounded-full font-black text-[10px] uppercase tracking-widest transition-all shadow-xl">
+        <i data-lucide="monitor-off" class="w-4 h-4"></i>
+        <span>Exit Teaching Mode</span>
+    </button>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-[60] w-72 border-r border-slate-800 bg-[#0f172a] flex flex-col transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center h-16">
+            <h2 class="font-bold flex items-center gap-2 text-blue-400">
+                <i data-lucide="layers" class="w-5 h-5"></i> EduCanvas
+            </h2>
+            <button onclick="toggleSidebar()" class="lg:hidden p-1 text-slate-400">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            <button onclick="createNewProject()" class="w-full flex items-center justify-center gap-2 p-3 bg-blue-600/10 border border-blue-500/30 rounded-xl hover:bg-blue-600/20 text-blue-400 transition-all font-bold text-xs uppercase tracking-widest">
+                <i data-lucide="plus" class="w-4 h-4"></i> New Project
+            </button>
+            
+            <div id="document-list" class="space-y-2"></div>
+            
+            <div class="pt-4 border-t border-slate-800 space-y-3">
+                <button onclick="addBlankPage()" class="w-full flex items-center gap-3 p-3 bg-slate-800/40 border border-slate-700 rounded-xl hover:border-slate-500 text-slate-300 transition-all text-xs font-bold">
+                    <i data-lucide="file-plus" class="w-4 h-4 text-blue-400"></i> New Blank Page
+                </button>
+                <label class="flex items-center gap-3 w-full p-3 bg-slate-800/40 border border-slate-700 rounded-xl hover:border-slate-500 text-slate-300 cursor-pointer transition-all">
+                    <i data-lucide="file-up" class="w-4 h-4 text-emerald-400"></i>
+                    <span class="text-xs font-bold">Upload PDF</span>
+                    <input type="file" onchange="handleFileUpload(event)" class="hidden" accept=".pdf">
+                </label>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#020617] relative h-full">
+        <header class="h-16 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between px-4 z-30">
+            <div class="flex items-center gap-2">
+                <button onclick="toggleSidebar()" class="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+                <div class="h-4 w-px bg-slate-800 mx-1"></div>
+                <span id="active-title" class="text-xs font-bold text-slate-200 truncate max-w-[200px]">Untitled Project</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleTeachingMode()" class="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-600/10 text-blue-400 border border-transparent hover:border-blue-500/30 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all">
+                    <i data-lucide="presentation" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Teaching Mode</span>
+                </button>
+                <button onclick="toggleSettings()" class="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+                <button onclick="exportPdf()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[10px] uppercase tracking-widest transition-all">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Export</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="hidden absolute top-16 right-4 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-5 space-y-6 overflow-y-auto max-h-[80vh] custom-scrollbar">
+            <div>
+                <h3 class="text-xs font-black uppercase tracking-widest text-orange-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="palette" class="w-4 h-4"></i> Page Backgrounds
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase mb-2">Classic Papers</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="updateBg('#ffffff')" class="bg-color-btn bg-white"></button>
+                            <button onclick="updateBg('#fefce8')" class="bg-color-btn bg-yellow-50"></button>
+                            <button onclick="updateBg('#f8fafc')" class="bg-color-btn bg-slate-50"></button>
+                            <button onclick="updateBg('#ecfdf5')" class="bg-color-btn bg-emerald-50"></button>
+                            <button onclick="updateBg('#fff1f2')" class="bg-color-btn bg-rose-50"></button>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase mb-2">Pro Palettes</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="updateBg('#1e293b')" class="bg-color-btn bg-slate-800"></button>
+                            <button onclick="updateBg('#0f172a')" class="bg-color-btn bg-slate-900"></button>
+                            <button onclick="updateBg('#1e1b4b')" class="bg-color-btn bg-indigo-950"></button>
+                            <button onclick="updateBg('#064e3b')" class="bg-color-btn bg-emerald-950"></button>
+                            <button onclick="updateBg('#27272a')" class="bg-color-btn bg-zinc-800"></button>
+                            <div class="h-7 w-px bg-slate-800 mx-1"></div>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="custom-bg-picker" oninput="updateBg(this.value)" class="color-picker-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="grid-3x3" class="w-4 h-4"></i> Layout Overlay
+                </h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="updateLayout('none')" id="layout-none" class="p-2 border border-slate-700 rounded-lg text-[9px] font-bold uppercase transition-all">None</button>
+                    <button onclick="updateLayout('grid')" id="layout-grid" class="p-2 border border-slate-700 rounded-lg text-[9px] font-bold uppercase transition-all">Grid</button>
+                    <button onclick="updateLayout('ruler')" id="layout-ruler" class="p-2 border border-slate-700 rounded-lg text-[9px] font-bold uppercase transition-all">Rulers</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs font-black uppercase tracking-widest text-blue-400 mb-4 flex items-center justify-between">
+                    <span class="flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Watermark</span>
+                    <button onclick="toggleWatermark()" id="toggle-wm" class="w-10 h-5 bg-slate-700 rounded-full relative transition-all">
+                        <div id="wm-toggle-dot" class="absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform"></div>
+                    </button>
+                </h3>
+                <div id="wm-options" class="space-y-4">
+                    <div class="flex p-1 bg-slate-800 rounded-lg">
+                        <button onclick="setWmType('text')" id="wm-type-text" class="flex-1 py-1 text-[9px] font-black uppercase rounded bg-slate-700 text-white">Text</button>
+                        <button onclick="setWmType('image')" id="wm-type-image" class="flex-1 py-1 text-[9px] font-black uppercase rounded text-slate-400">Image</button>
+                    </div>
+                    <div id="wm-text-controls" class="space-y-2">
+                        <input type="text" id="wm-text-input" oninput="updateWatermarkText(this.value)" placeholder="Watermark Text" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                    </div>
+                    <div id="wm-image-controls" class="hidden space-y-2">
+                        <label class="flex items-center justify-center gap-2 w-full p-2 bg-slate-800 border-2 border-dashed border-slate-700 rounded-xl hover:border-blue-500 text-slate-400 cursor-pointer transition-all">
+                            <i data-lucide="image" class="w-4 h-4"></i>
+                            <span class="text-[10px] font-bold">Upload Logo</span>
+                            <input type="file" onchange="handleWatermarkImage(event)" class="hidden" accept="image/*">
+                        </label>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Visibility</label>
+                            <span id="opacity-val" class="text-[10px] font-mono text-blue-400">10%</span>
+                        </div>
+                        <input type="range" min="0.01" max="0.5" step="0.01" value="0.1" oninput="updateWatermarkOpacity(parseFloat(this.value))" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Adaptive Floating Toolbar -->
+        <div id="floating-toolbar" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 p-1.5 rounded-2xl flex items-center shadow-2xl transition-[padding,border-radius,width,height] duration-200">
+            <div id="drag-handle" class="p-2 text-slate-500 cursor-grab active:cursor-grabbing flex items-center justify-center">
+                <i data-lucide="grip-vertical" class="w-5 h-5 vertical-only hidden"></i>
+                <i data-lucide="grip-horizontal" class="w-5 h-5 horizontal-only"></i>
+            </div>
+            <div class="toolbar-group flex items-center gap-1.5 pr-2">
+                <button onclick="setTool('pen')" id="btn-pen" class="p-3 rounded-xl text-slate-400 tool-active"><i data-lucide="pen-tool" class="w-5 h-5"></i></button>
+                <button onclick="setTool('highlighter')" id="btn-highlighter" class="p-3 rounded-xl text-slate-400"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
+                <button onclick="setTool('eraser')" id="btn-eraser" class="p-3 rounded-xl text-slate-400"><i data-lucide="eraser" class="w-5 h-5"></i></button>
+                <div class="toolbar-divider w-px h-6 bg-slate-700 mx-1"></div>
+                <button onclick="undo()" class="p-3 rounded-xl text-slate-400 hover:text-white"><i data-lucide="undo-2" class="w-5 h-5"></i></button>
+                <button onclick="redo()" class="p-3 rounded-xl text-slate-400 hover:text-white"><i data-lucide="redo-2" class="w-5 h-5"></i></button>
+            </div>
+        </div>
+
+        <div id="editor-viewport" class="flex-1 overflow-y-auto custom-scrollbar p-8 flex flex-col items-center bg-[#020617] scroll-smooth"></div>
+    </main>
+
+    <div id="loader" class="hidden fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center">
+        <div class="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+    </div>
+
+    <script>
+        let activeTool = 'pen';
+        let documents = [{ id: 'doc1', title: 'Quick Edit Project', pages: [{ id: 'p1', type: 'blank', strokes: [], redoStack: [] }] }];
+        let activeDocId = 'doc1';
+        let pageLayout = 'none';
+        let pageBgColor = '#ffffff';
+        let watermarkConfig = { enabled: true, type: 'text', text: 'EduCanvas Pro', image: null, opacity: 0.1 };
+        let isTeachingMode = false;
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        // Enhanced Drag & Adaptive Orientation Logic
+        const toolbar = document.getElementById('floating-toolbar');
+        const dragHandle = document.getElementById('drag-handle');
+        let isDragging = false;
+        let startX, startY;
+        let initialLeft, initialTop;
+
+        const handleDragStart = (e) => {
+            isDragging = true;
+            const event = e.touches ? e.touches[0] : e;
+            startX = event.clientX;
+            startY = event.clientY;
+            initialLeft = toolbar.offsetLeft;
+            initialTop = toolbar.offsetTop;
+            
+            toolbar.classList.add('is-dragging');
+            toolbar.style.transition = 'none';
+            toolbar.style.bottom = 'auto';
+            toolbar.style.right = 'auto';
+            document.body.style.userSelect = 'none';
+        };
+
+        const handleDragMove = (e) => {
+            if (!isDragging) return;
+            const event = e.touches ? e.touches[0] : e;
+            
+            let x = initialLeft + (event.clientX - startX);
+            let y = initialTop + (event.clientY - startY);
+
+            // Boundary constraints
+            const margin = 10;
+            const maxW = window.innerWidth - toolbar.offsetWidth - margin;
+            const maxH = window.innerHeight - toolbar.offsetHeight - margin;
+            x = Math.max(margin, Math.min(x, maxW));
+            y = Math.max(margin, Math.min(y, maxH));
+
+            toolbar.style.left = `${x}px`;
+            toolbar.style.top = `${y}px`;
+            toolbar.style.transform = 'none';
+
+            // Adaptive orientation detection
+            const verticalThreshold = 100;
+            const isNearEdge = x < verticalThreshold || x > (window.innerWidth - toolbar.offsetWidth - verticalThreshold);
+            
+            if (isNearEdge) {
+                toolbar.classList.add('vertical');
+                toolbar.querySelector('.horizontal-only').classList.add('hidden');
+                toolbar.querySelector('.vertical-only').classList.remove('hidden');
+            } else {
+                toolbar.classList.remove('vertical');
+                toolbar.querySelector('.horizontal-only').classList.remove('hidden');
+                toolbar.querySelector('.vertical-only').classList.add('hidden');
+            }
+        };
+
+        const handleDragEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            toolbar.classList.remove('is-dragging');
+            toolbar.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            document.body.style.userSelect = '';
+        };
+
+        dragHandle.addEventListener('mousedown', handleDragStart);
+        window.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('mouseup', handleDragEnd);
+        
+        dragHandle.addEventListener('touchstart', (e) => { e.preventDefault(); handleDragStart(e); });
+        window.addEventListener('touchmove', (e) => { if (isDragging) e.preventDefault(); handleDragMove(e); }, { passive: false });
+        window.addEventListener('touchend', handleDragEnd);
+
+        function getContrastColor(hex) {
+            if (!hex) return 'rgba(0,0,0,0.1)';
+            hex = hex.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            return brightness > 150 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)';
+        }
+
+        function toggleTeachingMode() {
+            isTeachingMode = !isTeachingMode;
+            document.body.classList.toggle('teaching-mode', isTeachingMode);
+            render();
+        }
+
+        function updateBg(color) { 
+            pageBgColor = color; 
+            const picker = document.getElementById('custom-bg-picker');
+            if(picker) picker.value = color;
+            render(); 
+        }
+
+        function updateLayout(layout) { pageLayout = layout; render(); syncSettingsUI(); }
+        
+        function setWmType(type) {
+            watermarkConfig.type = type;
+            document.getElementById('wm-text-controls').classList.toggle('hidden', type !== 'text');
+            document.getElementById('wm-image-controls').classList.toggle('hidden', type !== 'image');
+            document.getElementById('wm-type-text').classList.toggle('bg-slate-700', type === 'text');
+            document.getElementById('wm-type-text').classList.toggle('text-white', type === 'text');
+            document.getElementById('wm-type-image').classList.toggle('bg-slate-700', type === 'image');
+            document.getElementById('wm-type-image').classList.toggle('text-white', type === 'image');
+            render();
+        }
+
+        function handleWatermarkImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                watermarkConfig.image = event.target.result;
+                render();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function toggleWatermark() { watermarkConfig.enabled = !watermarkConfig.enabled; render(); syncSettingsUI(); }
+        function updateWatermarkText(val) { watermarkConfig.text = val; render(); }
+        function updateWatermarkOpacity(val) { 
+            watermarkConfig.opacity = val; 
+            document.getElementById('opacity-val').textContent = Math.round(val * 100) + '%'; 
+            render(); 
+        }
+
+        function syncSettingsUI() {
+            const toggle = document.getElementById('toggle-wm');
+            const dot = document.getElementById('wm-toggle-dot');
+            if (toggle) {
+                toggle.className = `w-10 h-5 rounded-full relative transition-all ${watermarkConfig.enabled ? 'bg-blue-600' : 'bg-slate-700'}`;
+                dot.style.transform = watermarkConfig.enabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+            ['none', 'grid', 'ruler'].forEach(l => {
+                const btn = document.getElementById(`layout-${l}`);
+                if(btn) btn.className = `p-2 border rounded-lg text-[9px] font-bold uppercase transition-all ${pageLayout === l ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-700 text-slate-400'}`;
+            });
+            document.querySelectorAll('.bg-color-btn').forEach(btn => {
+                const isMatch = btn.getAttribute('onclick')?.includes(pageBgColor);
+                btn.classList.toggle('active', !!isMatch);
+            });
+        }
+
+        function render() {
+            const viewport = document.getElementById('editor-viewport');
+            const docList = document.getElementById('document-list');
+            const activeDoc = documents.find(d => d.id === activeDocId);
+            document.getElementById('active-title').textContent = activeDoc.title;
+
+            docList.innerHTML = '';
+            documents.forEach(doc => {
+                const div = document.createElement('div');
+                div.className = `p-3 rounded-xl border cursor-pointer flex items-center gap-3 ${activeDocId === doc.id ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-800/40 border-slate-700'}`;
+                div.onclick = () => { activeDocId = doc.id; render(); };
+                div.innerHTML = `<div class="w-8 h-10 rounded bg-slate-900 flex items-center justify-center"><i data-lucide="file-text" class="w-4 h-4 text-blue-400"></i></div><div class="min-w-0 flex-1"><p class="text-xs font-semibold truncate">${doc.title}</p></div>`;
+                docList.appendChild(div);
+            });
+
+            viewport.innerHTML = '';
+            const lineColor = getContrastColor(pageBgColor);
+
+            activeDoc.pages.forEach((page, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'pdf-page-wrapper';
+                
+                const container = document.createElement('div');
+                container.className = 'pdf-page-container';
+                container.style.backgroundColor = pageBgColor;
+                container.style.setProperty('--line-color', lineColor);
+                
+                const bg = document.createElement('canvas');
+                bg.className = 'layer-canvas z-0';
+                container.appendChild(bg);
+
+                if (pageLayout === 'grid') {
+                    const grid = document.createElement('div');
+                    grid.className = 'grid-layer';
+                    container.appendChild(grid);
+                } else if (pageLayout === 'ruler') {
+                    const ruler = document.createElement('div');
+                    ruler.className = 'ruler-layer';
+                    container.appendChild(ruler);
+                }
+
+                if (watermarkConfig.enabled) {
+                    const wm = document.createElement('div');
+                    wm.className = 'watermark-layer';
+                    const wmColor = lineColor.replace('0.12', '0.08').replace('0.18', '0.1');
+                    if (watermarkConfig.type === 'text') {
+                        wm.innerHTML = `<span class="watermark-text" style="color: ${wmColor}; opacity: ${watermarkConfig.opacity * 6}">${watermarkConfig.text}</span>`;
+                    } else if (watermarkConfig.image) {
+                        wm.innerHTML = `<img src="${watermarkConfig.image}" class="watermark-image" style="opacity: ${watermarkConfig.opacity}">`;
+                    }
+                    container.appendChild(wm);
+                }
+
+                const pageNo = document.createElement('div');
+                pageNo.className = 'page-number-overlay';
+                pageNo.style.color = lineColor;
+                pageNo.textContent = `Page ${idx + 1} of ${activeDoc.pages.length}`;
+                container.appendChild(pageNo);
+
+                const int = document.createElement('canvas');
+                int.id = `int-${page.id}`;
+                int.className = 'layer-canvas z-30 cursor-crosshair';
+                container.appendChild(int);
+
+                const actions = document.createElement('div');
+                actions.className = 'page-actions';
+                actions.innerHTML = `
+                    <button onclick="addBlankPage(${idx})" class="action-btn">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Add Page
+                    </button>
+                    <label class="action-btn cursor-pointer">
+                        <i data-lucide="file-up" class="w-3.5 h-3.5 text-emerald-400"></i> Append PDF
+                        <input type="file" onchange="handleFileUpload(event, ${idx})" class="hidden" accept=".pdf">
+                    </label>
+                    <button onclick="deletePage(${idx})" class="action-btn text-red-400 hover:text-red-300">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+                    </button>`;
+
+                wrapper.appendChild(container);
+                wrapper.appendChild(actions);
+                viewport.appendChild(wrapper);
+
+                if (page.type === 'pdf') page.render(bg);
+                setTimeout(() => { syncCanvasSize(int); redrawPage(page.id); initDrawing(int, page); }, 50);
+            });
+            lucide.createIcons();
+            syncSettingsUI();
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function toggleSettings() { document.getElementById('settings-panel').classList.toggle('hidden'); }
+        
+        function setTool(tool) {
+            activeTool = tool;
+            document.querySelectorAll('#floating-toolbar button').forEach(b => b.classList.remove('tool-active'));
+            const btn = document.getElementById(`btn-${tool}`);
+            if(btn) btn.classList.add('tool-active');
+        }
+
+        function syncCanvasSize(canvas) {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        }
+
+        function initDrawing(canvas, page) {
+            const ctx = canvas.getContext('2d');
+            let currentStroke = null;
+            const getPos = (e) => {
+                const r = canvas.getBoundingClientRect();
+                const c = (e.touches && e.touches[0]) ? e.touches[0] : e;
+                return { x: c.clientX - r.left, y: c.clientY - r.top };
+            };
+            const start = (e) => {
+                const pos = getPos(e);
+                currentStroke = { 
+                    points: [pos], 
+                    color: activeTool === 'pen' ? '#3b82f6' : (activeTool === 'highlighter' ? '#eab308' : '#000000'), 
+                    width: activeTool === 'pen' ? 2 : (activeTool === 'highlighter' ? 15 : 25), 
+                    alpha: activeTool === 'highlighter' ? 0.3 : 1, 
+                    mode: activeTool === 'eraser' ? 'destination-out' : 'source-over' 
+                };
+                ctx.beginPath(); ctx.strokeStyle = currentStroke.color; ctx.lineWidth = currentStroke.width; ctx.globalAlpha = currentStroke.alpha; ctx.globalCompositeOperation = currentStroke.mode; ctx.moveTo(pos.x, pos.y);
+            };
+            const move = (e) => { if (!currentStroke) return; const pos = getPos(e); currentStroke.points.push(pos); ctx.lineTo(pos.x, pos.y); ctx.stroke(); };
+            const end = () => { if (currentStroke) { page.strokes.push(currentStroke); page.redoStack = []; currentStroke = null; } };
+            canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = end;
+            canvas.ontouchstart = (e) => { e.preventDefault(); start(e); }; canvas.ontouchmove = (e) => { e.preventDefault(); move(e); }; canvas.ontouchend = end;
+        }
+
+        function redrawPage(pageId) {
+            const canvas = document.querySelector(`#int-${pageId}`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages.find(p => p.id === pageId);
+            const dpr = window.devicePixelRatio || 1;
+            ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            page.strokes.forEach(s => {
+                ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.globalAlpha = s.alpha; ctx.globalCompositeOperation = s.mode;
+                s.points.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }); ctx.stroke();
+            });
+        }
+
+        function undo() { 
+            const doc = documents.find(d => d.id === activeDocId);
+            doc.pages.forEach(p => { if (p.strokes.length) { p.redoStack.push(p.strokes.pop()); redrawPage(p.id); } });
+        }
+        function redo() { 
+            const doc = documents.find(d => d.id === activeDocId);
+            doc.pages.forEach(p => { if (p.redoStack.length) { p.strokes.push(p.redoStack.pop()); redrawPage(p.id); } });
+        }
+
+        function createNewProject() {
+            const id = 'doc_' + Date.now();
+            documents.push({ id, title: 'Project ' + (documents.length + 1), pages: [{ id: 'p_' + Date.now(), type: 'blank', strokes: [], redoStack: [] }] });
+            activeDocId = id; render();
+        }
+
+        function addBlankPage(idx) {
+            const doc = documents.find(d => d.id === activeDocId);
+            const newPage = { id: 'p_' + Date.now(), type: 'blank', strokes: [], redoStack: [] };
+            if (idx !== undefined) doc.pages.splice(idx + 1, 0, newPage);
+            else doc.pages.push(newPage);
+            render();
+        }
+
+        function deletePage(idx) {
+            const doc = documents.find(d => d.id === activeDocId);
+            if (doc.pages.length > 1) { doc.pages.splice(idx, 1); render(); }
+        }
+
+        async function handleFileUpload(e, insertIdx) {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('loader').classList.remove('hidden');
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                const doc = documents.find(d => d.id === activeDocId);
+                const newPages = [];
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 2 });
+                    newPages.push({ 
+                        id: `pdf_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 5)}`, 
+                        type: 'pdf', 
+                        strokes: [], 
+                        redoStack: [], 
+                        render: async (c) => {
+                            const ctx = c.getContext('2d');
+                            c.width = viewport.width; c.height = viewport.height;
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                        }
+                    });
+                }
+                if (insertIdx !== undefined) doc.pages.splice(insertIdx + 1, 0, ...newPages);
+                else doc.pages.push(...newPages);
+            } catch(err) { console.error(err); }
+            document.getElementById('loader').classList.add('hidden');
+            render();
+        }
+
+        async function exportPdf() {
+            document.getElementById('loader').classList.remove('hidden');
+            const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+            const containers = document.querySelectorAll('.pdf-page-container');
+            for (let i = 0; i < containers.length; i++) {
+                if (i > 0) pdf.addPage();
+                const canvas = await html2canvas(containers[i], { scale: 1.5, useCORS: true });
+                pdf.addImage(canvas.toDataURL('image/jpeg', 0.8), 'JPEG', 0, 0, 210, 297);
+            }
+            pdf.save('EduCanvas_Export.pdf');
+            document.getElementById('loader').classList.add('hidden');
+        }
+
+        window.onload = () => { render(); lucide.createIcons(); };
+    </script>
+</body>
+</html>
