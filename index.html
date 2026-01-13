@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduCanvas Pro - PDF Editor</title>
+    <title>EduCanvas Pro - Ultimate PDF Editor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Caveat:wght@700&family=Merriweather:wght@400;700&family=Source+Code+Pro:wght@500&display=swap');
         
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: #e2e8f0; overflow: hidden; height: 100vh; }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
@@ -43,7 +43,6 @@
             .pdf-page-container { max-width: 800px; }
         }
 
-        /* Teaching Mode Canvas Expansion */
         .teaching-mode .pdf-page-container {
             max-width: 95vw !important;
             width: 95vw !important;
@@ -56,19 +55,16 @@
             z-index: 10;
         }
 
-        /* Spacing increased by 50% (0.5 increase) */
-        /* Grid: 50px -> 75px */
         .grid-layer {
             background-image: 
                 linear-gradient(to right, var(--line-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--line-color) 1px, transparent 1px);
-            background-size: 75px 75px; 
+            background-size: 50px 50px;
         }
         
-        /* Ruler: 40px -> 60px */
         .ruler-layer {
-            background-size: 100% 60px;
-            background-image: linear-gradient(to bottom, transparent 59px, var(--line-color) 59px);
+            background-size: 100% 40px;
+            background-image: linear-gradient(to bottom, transparent 39px, var(--line-color) 39px);
         }
 
         .watermark-layer {
@@ -80,21 +76,15 @@
             pointer-events: none;
             z-index: 5;
             user-select: none;
+            overflow: hidden;
         }
 
-        .watermark-text {
+        .watermark-content {
             font-weight: 900;
-            font-size: clamp(2rem, 10vw, 5rem);
             text-transform: uppercase;
-            transform: rotate(-45deg);
             white-space: nowrap;
-        }
-
-        .watermark-image {
-            max-width: 50%;
-            max-height: 50%;
-            object-fit: contain;
-            transform: rotate(-15deg);
+            text-align: center;
+            pointer-events: none;
         }
 
         .page-number-overlay {
@@ -153,70 +143,102 @@
         .tool-active { background-color: #2563eb !important; color: white !important; }
 
         .bg-color-btn { 
-            width: 28px; 
-            height: 28px; 
-            border-radius: 8px; 
-            border: 2px solid #334155; 
-            cursor: pointer; 
-            transition: transform 0.2s, border-color 0.2s;
+            width: 28px; height: 28px; border-radius: 8px; border: 2px solid #334155; cursor: pointer; transition: transform 0.2s, border-color 0.2s;
         }
         .bg-color-btn:hover { transform: scale(1.1); border-color: #4f46e5; }
         .bg-color-btn.active { border-color: #3b82f6; outline: 2px solid #3b82f6; outline-offset: 2px; }
 
         .color-picker-wrapper {
-            position: relative;
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 2px solid #334155;
-            background-image: conic-gradient(red, yellow, green, cyan, blue, magenta, red);
+            position: relative; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; border: 2px solid #334155; background-image: conic-gradient(red, yellow, green, cyan, blue, magenta, red);
         }
         .color-picker-input {
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            cursor: pointer;
-            opacity: 0;
+            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; cursor: pointer; opacity: 0;
         }
 
-        /* Adaptive Toolbar Orientation Styles */
         #floating-toolbar {
             transition: transform 0.1s ease-out, padding 0.2s, background 0.2s;
             touch-action: none;
         }
-        #floating-toolbar.vertical {
+        #floating-toolbar.vertical { flex-direction: column; width: auto; height: auto; }
+        #floating-toolbar.vertical .toolbar-divider { width: 24px; height: 1px; margin: 4px 0; }
+        #floating-toolbar.vertical .toolbar-group { flex-direction: column; padding-right: 0; padding-bottom: 8px; }
+        #floating-toolbar.is-dragging { background: rgba(15, 23, 42, 0.8); cursor: grabbing; scale: 1.02; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5); }
+
+        /* Tool Popup Styles */
+        .tool-group { position: relative; }
+        .tool-popup {
+            position: absolute;
+            bottom: 120%; /* Moved closer */
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 12px;
+            border-radius: 12px;
+            display: none;
             flex-direction: column;
-            width: auto;
-            height: auto;
+            gap: 10px;
+            width: 220px;
+            z-index: 150;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
         }
-        #floating-toolbar.vertical .toolbar-divider {
-            width: 24px;
-            height: 1px;
-            margin: 4px 0;
-        }
-        #floating-toolbar.vertical .toolbar-group {
-            flex-direction: column;
-            padding-right: 0;
-            padding-bottom: 8px;
-        }
-        #floating-toolbar.is-dragging {
-            background: rgba(15, 23, 42, 0.8);
-            cursor: grabbing;
-            scale: 1.02;
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);
+        
+        /* Bridge to prevent closing */
+        .tool-group::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            width: 100%;
+            height: 20px; /* Bridge height */
+            background: transparent;
         }
 
-        #teaching-exit {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            display: none;
+        .tool-group:hover .tool-popup, .tool-popup:hover { 
+            display: flex; 
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
+        
+        .tool-popup::after {
+            content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #1e293b transparent transparent transparent;
+        }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #3b82f6; margin-top: -5px; cursor: pointer; box-shadow: 0 0 0 2px #1e293b; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #475569; border-radius: 2px; }
+
+        /* Lasso Context Menu */
+        #lasso-menu {
+            position: absolute; display: none; gap: 6px; background: #0f172a; padding: 6px; border-radius: 10px; border: 1px solid #334155; box-shadow: 0 10px 20px rgba(0,0,0,0.5); z-index: 200; transform: translate(-50%, -120%);
+        }
+
+        /* Text Input Styling */
+        .text-input-overlay {
+            position: absolute;
+            background: transparent;
+            border: 1px dashed #3b82f6;
+            outline: none;
+            color: black;
+            padding: 2px;
+            z-index: 100;
+            resize: none;
+            overflow: hidden;
+            min-width: 20px;
+            white-space: pre;
+        }
+
+        #teaching-exit { position: fixed; top: 20px; right: 20px; z-index: 1000; display: none; }
         .teaching-mode #teaching-exit { display: flex; }
+        
+        /* Settings Tabs */
+        .tab-btn { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; text-transform: uppercase; transition: all 0.2s; border: 1px solid transparent; }
+        .tab-btn.active { background: #2563eb; color: white; }
+        .tab-btn:not(.active) { color: #94a3b8; border-color: #334155; }
+        .tab-btn:not(.active):hover { background: #1e293b; color: #cbd5e1; }
     </style>
 </head>
 <body id="app-body" class="flex flex-col lg:flex-row">
@@ -225,6 +247,18 @@
         <i data-lucide="monitor-off" class="w-4 h-4"></i>
         <span>Exit Teaching Mode</span>
     </button>
+    
+    <!-- Global Hidden PDF Input -->
+    <input type="file" id="pdf-upload-input" onchange="handleFileUpload(event)" class="hidden" accept=".pdf">
+
+    <div id="lasso-menu">
+        <div class="relative group">
+            <button class="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 text-white" title="Change Color"><i data-lucide="palette" class="w-4 h-4"></i></button>
+            <input type="color" oninput="lassoChangeColor(this.value)" class="absolute inset-0 opacity-0 cursor-pointer">
+        </div>
+        <button onclick="lassoCopy()" class="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 text-blue-400" title="Copy"><i data-lucide="copy" class="w-4 h-4"></i></button>
+        <button onclick="lassoDelete()" class="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 text-red-400" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+    </div>
 
     <!-- Sidebar -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-[60] w-72 border-r border-slate-800 bg-[#0f172a] flex flex-col transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static">
@@ -241,18 +275,23 @@
             <button onclick="createNewProject()" class="w-full flex items-center justify-center gap-2 p-3 bg-blue-600/10 border border-blue-500/30 rounded-xl hover:bg-blue-600/20 text-blue-400 transition-all font-bold text-xs uppercase tracking-widest">
                 <i data-lucide="plus" class="w-4 h-4"></i> New Project
             </button>
-            
             <div id="document-list" class="space-y-2"></div>
-            
             <div class="pt-4 border-t border-slate-800 space-y-3">
                 <button onclick="addBlankPage()" class="w-full flex items-center gap-3 p-3 bg-slate-800/40 border border-slate-700 rounded-xl hover:border-slate-500 text-slate-300 transition-all text-xs font-bold">
                     <i data-lucide="file-plus" class="w-4 h-4 text-blue-400"></i> New Blank Page
                 </button>
-                <label class="flex items-center gap-3 w-full p-3 bg-slate-800/40 border border-slate-700 rounded-xl hover:border-slate-500 text-slate-300 cursor-pointer transition-all">
+                <button onclick="triggerPdfUpload()" class="w-full flex items-center gap-3 p-3 bg-slate-800/40 border border-slate-700 rounded-xl hover:border-slate-500 text-slate-300 transition-all text-xs font-bold text-left">
                     <i data-lucide="file-up" class="w-4 h-4 text-emerald-400"></i>
-                    <span class="text-xs font-bold">Upload PDF</span>
-                    <input type="file" onchange="handleFileUpload(event)" class="hidden" accept=".pdf">
-                </label>
+                    <span>Upload PDF</span>
+                </button>
+            </div>
+            <div class="mt-4 p-3 bg-indigo-900/20 rounded-xl border border-indigo-500/20 text-[10px] text-indigo-300 leading-relaxed">
+                <p class="font-bold mb-1"><i data-lucide="info" class="w-3 h-3 inline mr-1"></i> Quick Tips:</p>
+                <ul class="list-disc pl-3 space-y-1 opacity-80">
+                    <li>Paste (Ctrl+V) images/text directly</li>
+                    <li>Double-click text to edit</li>
+                    <li>Hover tools for settings</li>
+                </ul>
             </div>
         </div>
     </aside>
@@ -284,41 +323,28 @@
 
         <!-- Settings Panel -->
         <div id="settings-panel" class="hidden absolute top-16 right-4 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-5 space-y-6 overflow-y-auto max-h-[80vh] custom-scrollbar">
-            <div>
+             <div>
                 <h3 class="text-xs font-black uppercase tracking-widest text-orange-400 mb-4 flex items-center gap-2">
                     <i data-lucide="palette" class="w-4 h-4"></i> Page Backgrounds
                 </h3>
                 <div class="space-y-4">
-                    <div>
-                        <p class="text-[9px] font-black text-slate-500 uppercase mb-2">Classic Papers</p>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="updateBg('#ffffff')" class="bg-color-btn bg-white"></button>
-                            <button onclick="updateBg('#fefce8')" class="bg-color-btn bg-yellow-50"></button>
-                            <button onclick="updateBg('#f8fafc')" class="bg-color-btn bg-slate-50"></button>
-                            <button onclick="updateBg('#ecfdf5')" class="bg-color-btn bg-emerald-50"></button>
-                            <button onclick="updateBg('#fff1f2')" class="bg-color-btn bg-rose-50"></button>
-                        </div>
-                    </div>
-                    <div>
-                        <p class="text-[9px] font-black text-slate-500 uppercase mb-2">Pro Palettes</p>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="updateBg('#1e293b')" class="bg-color-btn bg-slate-800"></button>
-                            <button onclick="updateBg('#0f172a')" class="bg-color-btn bg-slate-900"></button>
-                            <button onclick="updateBg('#1e1b4b')" class="bg-color-btn bg-indigo-950"></button>
-                            <button onclick="updateBg('#064e3b')" class="bg-color-btn bg-emerald-950"></button>
-                            <button onclick="updateBg('#27272a')" class="bg-color-btn bg-zinc-800"></button>
-                            <div class="h-7 w-px bg-slate-800 mx-1"></div>
-                            <div class="color-picker-wrapper">
-                                <input type="color" id="custom-bg-picker" oninput="updateBg(this.value)" class="color-picker-input">
-                            </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="updateBg('#ffffff')" class="bg-color-btn bg-white"></button>
+                        <button onclick="updateBg('#fefce8')" class="bg-color-btn bg-yellow-50"></button>
+                        <button onclick="updateBg('#f8fafc')" class="bg-color-btn bg-slate-50"></button>
+                        <button onclick="updateBg('#1e293b')" class="bg-color-btn bg-slate-800"></button>
+                        <button onclick="updateBg('#0f172a')" class="bg-color-btn bg-slate-900"></button>
+                        <button onclick="updateBg('#27272a')" class="bg-color-btn bg-zinc-800"></button>
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="custom-bg-picker" oninput="updateBg(this.value)" class="color-picker-input">
                         </div>
                     </div>
                 </div>
             </div>
-
+            
             <div>
-                <h3 class="text-xs font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
-                    <i data-lucide="grid-3x3" class="w-4 h-4"></i> Layout Overlay
+                 <h3 class="text-xs font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="grid-3x3" class="w-4 h-4"></i> Layout
                 </h3>
                 <div class="grid grid-cols-3 gap-2">
                     <button onclick="updateLayout('none')" id="layout-none" class="p-2 border border-slate-700 rounded-lg text-[9px] font-bold uppercase transition-all">None</button>
@@ -327,34 +353,68 @@
                 </div>
             </div>
 
+            <!-- Watermark Settings -->
             <div>
-                <h3 class="text-xs font-black uppercase tracking-widest text-blue-400 mb-4 flex items-center justify-between">
-                    <span class="flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Watermark</span>
-                    <button onclick="toggleWatermark()" id="toggle-wm" class="w-10 h-5 bg-slate-700 rounded-full relative transition-all">
-                        <div id="wm-toggle-dot" class="absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform"></div>
-                    </button>
+                <h3 class="text-xs font-black uppercase tracking-widest text-blue-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="stamp" class="w-4 h-4"></i> Watermark
                 </h3>
-                <div id="wm-options" class="space-y-4">
-                    <div class="flex p-1 bg-slate-800 rounded-lg">
-                        <button onclick="setWmType('text')" id="wm-type-text" class="flex-1 py-1 text-[9px] font-black uppercase rounded bg-slate-700 text-white">Text</button>
-                        <button onclick="setWmType('image')" id="wm-type-image" class="flex-1 py-1 text-[9px] font-black uppercase rounded text-slate-400">Image</button>
-                    </div>
-                    <div id="wm-text-controls" class="space-y-2">
-                        <input type="text" id="wm-text-input" oninput="updateWatermarkText(this.value)" placeholder="Watermark Text" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
-                    </div>
-                    <div id="wm-image-controls" class="hidden space-y-2">
-                        <label class="flex items-center justify-center gap-2 w-full p-2 bg-slate-800 border-2 border-dashed border-slate-700 rounded-xl hover:border-blue-500 text-slate-400 cursor-pointer transition-all">
-                            <i data-lucide="image" class="w-4 h-4"></i>
-                            <span class="text-[10px] font-bold">Upload Logo</span>
-                            <input type="file" onchange="handleWatermarkImage(event)" class="hidden" accept="image/*">
-                        </label>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase">Visibility</label>
-                            <span id="opacity-val" class="text-[10px] font-mono text-blue-400">10%</span>
+                
+                <div class="flex gap-2 mb-4 bg-slate-800/50 p-1 rounded-lg">
+                    <button onclick="setWatermarkType('none')" id="wm-btn-none" class="tab-btn flex-1 active">None</button>
+                    <button onclick="setWatermarkType('text')" id="wm-btn-text" class="tab-btn flex-1">Text</button>
+                    <button onclick="setWatermarkType('image')" id="wm-btn-image" class="tab-btn flex-1">Image</button>
+                </div>
+
+                <div id="wm-controls" class="space-y-4">
+                    <!-- Text Only Controls -->
+                    <div id="wm-text-only" class="hidden space-y-3">
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Content</label>
+                            <input type="text" id="wm-text-input" oninput="updateWmSettings('text', this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none" placeholder="Watermark Text">
                         </div>
-                        <input type="range" min="0.01" max="0.5" step="0.01" value="0.1" oninput="updateWatermarkOpacity(parseFloat(this.value))" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Color</label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1 h-8 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                                    <input type="color" id="wm-color-input" oninput="updateWmSettings('color', this.value)" class="absolute -top-4 -left-4 w-24 h-24 cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Only Controls -->
+                    <div id="wm-image-only" class="hidden space-y-3">
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Upload Image</label>
+                            <input type="file" accept="image/*" onchange="handleWatermarkUpload(event)" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-blue-400 hover:file:bg-slate-700 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- Common Controls (Opacity, Size, Rotation) -->
+                    <div id="wm-common-controls" class="hidden space-y-3 pt-2 border-t border-slate-800">
+                        <div class="space-y-1">
+                            <div class="flex justify-between">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Opacity</label>
+                                <span id="wm-opacity-val" class="text-[9px] font-mono text-blue-400">0.2</span>
+                            </div>
+                            <input type="range" min="0.05" max="1" step="0.05" id="wm-opacity-input" oninput="updateWmSettings('opacity', this.value)">
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Size / Scale</label>
+                                <span id="wm-size-val" class="text-[9px] font-mono text-blue-400">100</span>
+                            </div>
+                            <input type="range" min="20" max="200" step="5" id="wm-size-input" oninput="updateWmSettings('size', this.value)">
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Rotation</label>
+                                <span id="wm-rot-val" class="text-[9px] font-mono text-blue-400">-45°</span>
+                            </div>
+                            <input type="range" min="-180" max="180" step="5" id="wm-rot-input" oninput="updateWmSettings('rotation', this.value)">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -366,13 +426,105 @@
                 <i data-lucide="grip-vertical" class="w-5 h-5 vertical-only hidden"></i>
                 <i data-lucide="grip-horizontal" class="w-5 h-5 horizontal-only"></i>
             </div>
+            
             <div class="toolbar-group flex items-center gap-1.5 pr-2">
-                <button onclick="setTool('pen')" id="btn-pen" class="p-3 rounded-xl text-slate-400 tool-active"><i data-lucide="pen-tool" class="w-5 h-5"></i></button>
-                <button onclick="setTool('highlighter')" id="btn-highlighter" class="p-3 rounded-xl text-slate-400"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
-                <button onclick="setTool('eraser')" id="btn-eraser" class="p-3 rounded-xl text-slate-400"><i data-lucide="eraser" class="w-5 h-5"></i></button>
+                <!-- Lasso Tool -->
+                <button onclick="setTool('lasso')" id="btn-lasso" class="p-3 rounded-xl text-slate-400 hover:text-white transition-colors relative" title="Select & Edit">
+                    <i data-lucide="lasso" class="w-5 h-5"></i>
+                </button>
+                
                 <div class="toolbar-divider w-px h-6 bg-slate-700 mx-1"></div>
-                <button onclick="undo()" class="p-3 rounded-xl text-slate-400 hover:text-white"><i data-lucide="undo-2" class="w-5 h-5"></i></button>
-                <button onclick="redo()" class="p-3 rounded-xl text-slate-400 hover:text-white"><i data-lucide="redo-2" class="w-5 h-5"></i></button>
+
+                <!-- Text Tool with Settings -->
+                <div class="tool-group">
+                    <button onclick="setTool('text')" id="btn-text" class="p-3 rounded-xl text-slate-400 hover:text-white transition-colors relative" title="Add Text">
+                        <i data-lucide="type" class="w-5 h-5"></i>
+                    </button>
+                    <div class="tool-popup w-56">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Font Style</span>
+                        </div>
+                        <select onchange="setTextFont(this.value)" class="w-full bg-slate-800 text-white text-xs border border-slate-700 rounded p-1 mb-2">
+                            <option value="'Inter', sans-serif">Sans Serif</option>
+                            <option value="'Merriweather', serif">Serif</option>
+                            <option value="'Caveat', cursive">Handwritten</option>
+                            <option value="'Source Code Pro', monospace">Monospace</option>
+                        </select>
+                         <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Size</span>
+                             <input type="number" min="8" max="72" value="16" onchange="setTextSize(this.value)" class="w-12 bg-slate-800 border border-slate-700 rounded text-xs text-center text-white">
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                             <button onclick="toggleTextBold()" class="flex-1 py-1 bg-slate-800 border border-slate-700 rounded hover:bg-slate-700 text-white font-bold text-xs">B</button>
+                             <div class="relative w-8 h-8 rounded border border-slate-600 overflow-hidden">
+                                <input type="color" oninput="setTextColor(this.value)" class="absolute -top-2 -left-2 w-12 h-12 cursor-pointer">
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pen Tool Group -->
+                <div class="tool-group">
+                    <button onclick="setTool('pen')" id="btn-pen" class="p-3 rounded-xl text-slate-400 tool-active" title="Pen Tool">
+                        <i data-lucide="pen-tool" class="w-5 h-5"></i>
+                    </button>
+                    <!-- Pen Settings Popup -->
+                    <div class="tool-popup">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Type</span>
+                        </div>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="setPenType('pen')" class="flex-1 py-1.5 bg-slate-800 rounded text-xs font-bold text-slate-300 hover:bg-slate-700 border border-slate-700">Pen</button>
+                            <button onclick="setPenType('marker')" class="flex-1 py-1.5 bg-slate-800 rounded text-xs font-bold text-slate-300 hover:bg-slate-700 border border-slate-700">Marker</button>
+                        </div>
+
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Thickness</span>
+                            <span id="pen-width-val" class="text-[10px] text-blue-400 font-mono">2px</span>
+                        </div>
+                        <input type="range" min="1" max="20" value="2" oninput="updatePenWidth(this.value)">
+                        
+                        <div class="mt-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Color</span>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="setPenColor('#3b82f6')" class="w-6 h-6 rounded-full bg-blue-500 border border-slate-600 hover:scale-110 transition-transform"></button>
+                                <button onclick="setPenColor('#ef4444')" class="w-6 h-6 rounded-full bg-red-500 border border-slate-600 hover:scale-110 transition-transform"></button>
+                                <button onclick="setPenColor('#22c55e')" class="w-6 h-6 rounded-full bg-green-500 border border-slate-600 hover:scale-110 transition-transform"></button>
+                                <button onclick="setPenColor('#eab308')" class="w-6 h-6 rounded-full bg-yellow-500 border border-slate-600 hover:scale-110 transition-transform"></button>
+                                <button onclick="setPenColor('#000000')" class="w-6 h-6 rounded-full bg-black border border-slate-600 hover:scale-110 transition-transform"></button>
+                                <div class="relative w-6 h-6 rounded-full overflow-hidden border border-slate-600 hover:scale-110 transition-transform">
+                                    <input type="color" oninput="setPenColor(this.value)" class="absolute -top-2 -left-2 w-10 h-10 cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Laser Tool -->
+                <button onclick="setTool('laser')" id="btn-laser" class="p-3 rounded-xl text-slate-400 hover:text-white transition-colors" title="Laser Pointer">
+                    <i data-lucide="zap" class="w-5 h-5 text-red-500"></i>
+                </button>
+
+                <button onclick="setTool('highlighter')" id="btn-highlighter" class="p-3 rounded-xl text-slate-400" title="Highlighter"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
+                
+                <!-- Eraser Tool Group -->
+                <div class="tool-group">
+                    <button onclick="setTool('eraser')" id="btn-eraser" class="p-3 rounded-xl text-slate-400" title="Eraser">
+                        <i data-lucide="eraser" class="w-5 h-5"></i>
+                    </button>
+                    <!-- Eraser Settings Popup -->
+                    <div class="tool-popup w-40">
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Size</span>
+                            <span id="eraser-width-val" class="text-[10px] text-blue-400 font-mono">25px</span>
+                        </div>
+                        <input type="range" min="5" max="100" value="25" oninput="updateEraserWidth(this.value)">
+                    </div>
+                </div>
+
+                <div class="toolbar-divider w-px h-6 bg-slate-700 mx-1"></div>
+                <button onclick="undo()" class="p-3 rounded-xl text-slate-400 hover:text-white" title="Undo"><i data-lucide="undo-2" class="w-5 h-5"></i></button>
+                <button onclick="redo()" class="p-3 rounded-xl text-slate-400 hover:text-white" title="Redo"><i data-lucide="redo-2" class="w-5 h-5"></i></button>
             </div>
         </div>
 
@@ -384,61 +536,74 @@
     </div>
 
     <script>
+        // --- State Management ---
         let activeTool = 'pen';
-        let documents = [{ id: 'doc1', title: 'Quick Edit Project', pages: [{ id: 'p1', type: 'blank', strokes: [], redoStack: [] }] }];
+        let penSettings = { color: '#3b82f6', width: 2, type: 'pen', alpha: 1 };
+        let eraserSettings = { width: 25 };
+        let textSettings = { font: "'Inter', sans-serif", size: 16, color: '#000000', bold: false };
+        let uploadTargetIndex = null; // Track where to insert PDF
+        
+        // Lasso State
+        let lassoState = {
+            active: false,
+            points: [], // Selection polygon
+            selected: { strokes: [], texts: [], images: [] }, // Indices of selected items
+            bounds: null, // {x, y, w, h}
+            pageId: null,
+            dragStart: null,
+            dragMode: null, // 'move', 'resize'
+            original: null // Snapshot for transformations
+        };
+
+        // Initialize documents with Watermark state
+        let documents = [{ 
+            id: 'doc1', 
+            title: 'Quick Edit Project', 
+            watermark: {
+                type: 'none', // 'none', 'text', 'image'
+                text: 'DRAFT',
+                imageSrc: null,
+                color: '#ef4444',
+                opacity: 0.2,
+                size: 50, // fontsize px or scale %
+                rotation: -45
+            },
+            pages: [{ id: 'p1', type: 'blank', strokes: [], texts: [], images: [], laserTrail: [], redoStack: [] }] 
+        }];
         let activeDocId = 'doc1';
         let pageLayout = 'none';
         let pageBgColor = '#ffffff';
-        let watermarkConfig = { enabled: true, type: 'text', text: 'EduCanvas Pro', image: null, opacity: 0.1 };
         let isTeachingMode = false;
-
+        
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-        // Enhanced Drag & Adaptive Orientation Logic
+        // --- Toolbar & Dragging ---
         const toolbar = document.getElementById('floating-toolbar');
         const dragHandle = document.getElementById('drag-handle');
-        let isDragging = false;
-        let startX, startY;
-        let initialLeft, initialTop;
+        let isDragging = false, startX, startY, initialLeft, initialTop;
 
         const handleDragStart = (e) => {
+            if(e.target.closest('input') || e.target.closest('select')) return;
             isDragging = true;
             const event = e.touches ? e.touches[0] : e;
-            startX = event.clientX;
-            startY = event.clientY;
-            initialLeft = toolbar.offsetLeft;
-            initialTop = toolbar.offsetTop;
-            
+            startX = event.clientX; startY = event.clientY;
+            initialLeft = toolbar.offsetLeft; initialTop = toolbar.offsetTop;
             toolbar.classList.add('is-dragging');
-            toolbar.style.transition = 'none';
-            toolbar.style.bottom = 'auto';
-            toolbar.style.right = 'auto';
+            toolbar.style.transition = 'none'; toolbar.style.bottom = 'auto'; toolbar.style.right = 'auto';
             document.body.style.userSelect = 'none';
         };
 
         const handleDragMove = (e) => {
             if (!isDragging) return;
             const event = e.touches ? e.touches[0] : e;
-            
             let x = initialLeft + (event.clientX - startX);
             let y = initialTop + (event.clientY - startY);
-
-            // Boundary constraints
-            const margin = 10;
-            const maxW = window.innerWidth - toolbar.offsetWidth - margin;
-            const maxH = window.innerHeight - toolbar.offsetHeight - margin;
-            x = Math.max(margin, Math.min(x, maxW));
-            y = Math.max(margin, Math.min(y, maxH));
-
-            toolbar.style.left = `${x}px`;
-            toolbar.style.top = `${y}px`;
-            toolbar.style.transform = 'none';
-
-            // Adaptive orientation detection
-            const verticalThreshold = 100;
-            const isNearEdge = x < verticalThreshold || x > (window.innerWidth - toolbar.offsetWidth - verticalThreshold);
+            x = Math.max(10, Math.min(x, window.innerWidth - toolbar.offsetWidth - 10));
+            y = Math.max(10, Math.min(y, window.innerHeight - toolbar.offsetHeight - 10));
+            toolbar.style.left = `${x}px`; toolbar.style.top = `${y}px`; toolbar.style.transform = 'none';
             
-            if (isNearEdge) {
+            // Adaptive Orientation
+            if (x < 100 || x > window.innerWidth - toolbar.offsetWidth - 100) {
                 toolbar.classList.add('vertical');
                 toolbar.querySelector('.horizontal-only').classList.add('hidden');
                 toolbar.querySelector('.vertical-only').classList.remove('hidden');
@@ -449,94 +614,136 @@
             }
         };
 
-        const handleDragEnd = () => {
-            if (!isDragging) return;
-            isDragging = false;
-            toolbar.classList.remove('is-dragging');
-            toolbar.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-            document.body.style.userSelect = '';
-        };
+        const handleDragEnd = () => { isDragging = false; toolbar.classList.remove('is-dragging'); toolbar.style.transition = ''; document.body.style.userSelect = ''; };
 
         dragHandle.addEventListener('mousedown', handleDragStart);
         window.addEventListener('mousemove', handleDragMove);
         window.addEventListener('mouseup', handleDragEnd);
-        
         dragHandle.addEventListener('touchstart', (e) => { e.preventDefault(); handleDragStart(e); });
         window.addEventListener('touchmove', (e) => { if (isDragging) e.preventDefault(); handleDragMove(e); }, { passive: false });
         window.addEventListener('touchend', handleDragEnd);
 
+        // --- Core UI Functions ---
         function getContrastColor(hex) {
             if (!hex) return 'rgba(0,0,0,0.1)';
             hex = hex.replace('#', '');
-            const r = parseInt(hex.substring(0, 2), 16);
-            const g = parseInt(hex.substring(2, 4), 16);
-            const b = parseInt(hex.substring(4, 6), 16);
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            return brightness > 150 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)';
+            const r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
+            return ((r * 299 + g * 587 + b * 114) / 1000) > 150 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)';
         }
 
-        function toggleTeachingMode() {
-            isTeachingMode = !isTeachingMode;
-            document.body.classList.toggle('teaching-mode', isTeachingMode);
-            render();
+        function toggleTeachingMode() { isTeachingMode = !isTeachingMode; document.body.classList.toggle('teaching-mode', isTeachingMode); render(); }
+        function updateBg(color) { pageBgColor = color; render(); }
+        function updateLayout(layout) { pageLayout = layout; render(); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function toggleSettings() { 
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('hidden'); 
+            if(!panel.classList.contains('hidden')) {
+                // Sync settings UI with current doc state
+                const doc = documents.find(d => d.id === activeDocId);
+                if(doc) {
+                    setWatermarkType(doc.watermark.type, false);
+                    document.getElementById('wm-text-input').value = doc.watermark.text;
+                    document.getElementById('wm-color-input').value = doc.watermark.color;
+                    document.getElementById('wm-opacity-input').value = doc.watermark.opacity;
+                    document.getElementById('wm-size-input').value = doc.watermark.size;
+                    document.getElementById('wm-rot-input').value = doc.watermark.rotation;
+                    
+                    document.getElementById('wm-opacity-val').textContent = doc.watermark.opacity;
+                    document.getElementById('wm-size-val').textContent = doc.watermark.size;
+                    document.getElementById('wm-rot-val').textContent = doc.watermark.rotation + '°';
+                }
+            }
         }
 
-        function updateBg(color) { 
-            pageBgColor = color; 
-            const picker = document.getElementById('custom-bg-picker');
-            if(picker) picker.value = color;
-            render(); 
+        function setTool(tool) {
+            if (activeTool === 'lasso' && tool !== 'lasso') clearLasso();
+            activeTool = tool;
+            document.querySelectorAll('#floating-toolbar button').forEach(b => b.classList.remove('tool-active'));
+            const btn = document.getElementById(`btn-${tool}`);
+            if(btn) btn.classList.add('tool-active');
         }
 
-        function updateLayout(layout) { pageLayout = layout; render(); syncSettingsUI(); }
+        // --- Settings Updates ---
+        function setPenColor(c) { penSettings.color = c; }
+        function updatePenWidth(w) { penSettings.width = parseInt(w); document.getElementById('pen-width-val').textContent = w + 'px'; }
+        function setPenType(t) { penSettings.type = t; penSettings.alpha = t === 'marker' ? 0.5 : 1; penSettings.width = t === 'marker' && penSettings.width < 10 ? 10 : penSettings.width; }
+        function updateEraserWidth(w) { eraserSettings.width = parseInt(w); document.getElementById('eraser-width-val').textContent = w + 'px'; }
         
-        function setWmType(type) {
-            watermarkConfig.type = type;
-            document.getElementById('wm-text-controls').classList.toggle('hidden', type !== 'text');
-            document.getElementById('wm-image-controls').classList.toggle('hidden', type !== 'image');
-            document.getElementById('wm-type-text').classList.toggle('bg-slate-700', type === 'text');
-            document.getElementById('wm-type-text').classList.toggle('text-white', type === 'text');
-            document.getElementById('wm-type-image').classList.toggle('bg-slate-700', type === 'image');
-            document.getElementById('wm-type-image').classList.toggle('text-white', type === 'image');
+        // Text Settings
+        function setTextFont(f) { textSettings.font = f; if(activeTool === 'lasso') applyTextSetting('font', f); }
+        function setTextSize(s) { textSettings.size = parseInt(s); if(activeTool === 'lasso') applyTextSetting('size', parseInt(s)); }
+        function setTextColor(c) { textSettings.color = c; if(activeTool === 'lasso') applyTextSetting('color', c); }
+        function toggleTextBold() { textSettings.bold = !textSettings.bold; if(activeTool === 'lasso') applyTextSetting('bold', textSettings.bold); }
+        
+        function applyTextSetting(key, val) {
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages.find(p => p.id === lassoState.pageId);
+            lassoState.selected.texts.forEach(idx => {
+                if(key === 'font') page.texts[idx].font = val;
+                if(key === 'size') page.texts[idx].fontSize = val;
+                if(key === 'color') page.texts[idx].color = val;
+                if(key === 'bold') page.texts[idx].bold = val;
+            });
+            redrawPage(lassoState.pageId, true);
+        }
+
+        // --- Watermark Functions ---
+        function setWatermarkType(type, shouldRender = true) {
+            const doc = documents.find(d => d.id === activeDocId);
+            doc.watermark.type = type;
+
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`wm-btn-${type}`).classList.add('active');
+
+            const common = document.getElementById('wm-common-controls');
+            const textControls = document.getElementById('wm-text-only');
+            const imgControls = document.getElementById('wm-image-only');
+
+            if (type === 'none') {
+                common.classList.add('hidden');
+                textControls.classList.add('hidden');
+                imgControls.classList.add('hidden');
+            } else if (type === 'text') {
+                common.classList.remove('hidden');
+                textControls.classList.remove('hidden');
+                imgControls.classList.add('hidden');
+            } else if (type === 'image') {
+                common.classList.remove('hidden');
+                textControls.classList.add('hidden');
+                imgControls.classList.remove('hidden');
+            }
+
+            if(shouldRender) render();
+        }
+
+        function updateWmSettings(key, value) {
+            const doc = documents.find(d => d.id === activeDocId);
+            doc.watermark[key] = value;
+            
+            // Update UI Labels
+            if(key === 'opacity') document.getElementById('wm-opacity-val').textContent = value;
+            if(key === 'size') document.getElementById('wm-size-val').textContent = value;
+            if(key === 'rotation') document.getElementById('wm-rot-val').textContent = value + '°';
+
             render();
         }
 
-        function handleWatermarkImage(e) {
+        function handleWatermarkUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
+            
             const reader = new FileReader();
             reader.onload = (event) => {
-                watermarkConfig.image = event.target.result;
+                const doc = documents.find(d => d.id === activeDocId);
+                doc.watermark.imageSrc = event.target.result;
                 render();
             };
             reader.readAsDataURL(file);
         }
 
-        function toggleWatermark() { watermarkConfig.enabled = !watermarkConfig.enabled; render(); syncSettingsUI(); }
-        function updateWatermarkText(val) { watermarkConfig.text = val; render(); }
-        function updateWatermarkOpacity(val) { 
-            watermarkConfig.opacity = val; 
-            document.getElementById('opacity-val').textContent = Math.round(val * 100) + '%'; 
-            render(); 
-        }
 
-        function syncSettingsUI() {
-            const toggle = document.getElementById('toggle-wm');
-            const dot = document.getElementById('wm-toggle-dot');
-            if (toggle) {
-                toggle.className = `w-10 h-5 rounded-full relative transition-all ${watermarkConfig.enabled ? 'bg-blue-600' : 'bg-slate-700'}`;
-                dot.style.transform = watermarkConfig.enabled ? 'translateX(20px)' : 'translateX(0px)';
-            }
-            ['none', 'grid', 'ruler'].forEach(l => {
-                const btn = document.getElementById(`layout-${l}`);
-                if(btn) btn.className = `p-2 border rounded-lg text-[9px] font-bold uppercase transition-all ${pageLayout === l ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-700 text-slate-400'}`;
-            });
-            document.querySelectorAll('.bg-color-btn').forEach(btn => {
-                const isMatch = btn.getAttribute('onclick')?.includes(pageBgColor);
-                btn.classList.toggle('active', !!isMatch);
-            });
-        }
-
+        // --- Render & Canvas Logic ---
         function render() {
             const viewport = document.getElementById('editor-viewport');
             const docList = document.getElementById('document-list');
@@ -564,76 +771,65 @@
                 container.style.backgroundColor = pageBgColor;
                 container.style.setProperty('--line-color', lineColor);
                 
-                const bg = document.createElement('canvas');
-                bg.className = 'layer-canvas z-0';
-                container.appendChild(bg);
-
-                if (pageLayout === 'grid') {
-                    const grid = document.createElement('div');
-                    grid.className = 'grid-layer';
-                    container.appendChild(grid);
-                } else if (pageLayout === 'ruler') {
-                    const ruler = document.createElement('div');
-                    ruler.className = 'ruler-layer';
-                    container.appendChild(ruler);
+                // Layers
+                const bg = document.createElement('canvas'); bg.className = 'layer-canvas z-0';
+                
+                // Watermark Layer
+                const wmLayer = document.createElement('div');
+                wmLayer.className = 'watermark-layer';
+                
+                if (activeDoc.watermark.type === 'text' && activeDoc.watermark.text) {
+                    const txt = document.createElement('div');
+                    txt.className = 'watermark-content';
+                    txt.textContent = activeDoc.watermark.text;
+                    txt.style.color = activeDoc.watermark.color;
+                    txt.style.opacity = activeDoc.watermark.opacity;
+                    // Font size responsive to container width using vw-like calculation
+                    // We'll use a base scale. 50 = 5rem roughly.
+                    txt.style.fontSize = `clamp(20px, ${activeDoc.watermark.size / 10}rem, 200px)`; 
+                    txt.style.transform = `rotate(${activeDoc.watermark.rotation}deg)`;
+                    wmLayer.appendChild(txt);
+                } else if (activeDoc.watermark.type === 'image' && activeDoc.watermark.imageSrc) {
+                    const img = document.createElement('img');
+                    img.src = activeDoc.watermark.imageSrc;
+                    img.className = 'watermark-content';
+                    img.style.opacity = activeDoc.watermark.opacity;
+                    // Scale: 100 = 50% width
+                    img.style.width = `${activeDoc.watermark.size / 2}%`;
+                    img.style.transform = `rotate(${activeDoc.watermark.rotation}deg)`;
+                    wmLayer.appendChild(img);
                 }
 
-                if (watermarkConfig.enabled) {
-                    const wm = document.createElement('div');
-                    wm.className = 'watermark-layer';
-                    const wmColor = lineColor.replace('0.12', '0.08').replace('0.18', '0.1');
-                    if (watermarkConfig.type === 'text') {
-                        wm.innerHTML = `<span class="watermark-text" style="color: ${wmColor}; opacity: ${watermarkConfig.opacity * 6}">${watermarkConfig.text}</span>`;
-                    } else if (watermarkConfig.image) {
-                        wm.innerHTML = `<img src="${watermarkConfig.image}" class="watermark-image" style="opacity: ${watermarkConfig.opacity}">`;
-                    }
-                    container.appendChild(wm);
-                }
-
+                const layout = document.createElement('div');
+                if (pageLayout === 'grid') layout.className = 'grid-layer';
+                else if (pageLayout === 'ruler') layout.className = 'ruler-layer';
+                
                 const pageNo = document.createElement('div');
                 pageNo.className = 'page-number-overlay';
                 pageNo.style.color = lineColor;
-                pageNo.textContent = `Page ${idx + 1} of ${activeDoc.pages.length}`;
-                container.appendChild(pageNo);
+                pageNo.textContent = `Page ${idx + 1}`;
 
                 const int = document.createElement('canvas');
                 int.id = `int-${page.id}`;
                 int.className = 'layer-canvas z-30 cursor-crosshair';
-                container.appendChild(int);
+                
+                container.append(bg, wmLayer, layout, pageNo, int);
 
                 const actions = document.createElement('div');
                 actions.className = 'page-actions';
                 actions.innerHTML = `
-                    <button onclick="addBlankPage(${idx})" class="action-btn">
-                        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Add Page
-                    </button>
-                    <label class="action-btn cursor-pointer">
-                        <i data-lucide="file-up" class="w-3.5 h-3.5 text-emerald-400"></i> Append PDF
-                        <input type="file" onchange="handleFileUpload(event, ${idx})" class="hidden" accept=".pdf">
-                    </label>
-                    <button onclick="deletePage(${idx})" class="action-btn text-red-400 hover:text-red-300">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
-                    </button>`;
+                    <button onclick="addBlankPage(${idx})" class="action-btn"><i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Add</button>
+                    <button onclick="triggerPdfUpload(${idx})" class="action-btn text-blue-400"><i data-lucide="file-up" class="w-3.5 h-3.5"></i> PDF</button>
+                    <button onclick="deletePage(${idx})" class="action-btn text-red-400"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Del</button>`;
 
-                wrapper.appendChild(container);
-                wrapper.appendChild(actions);
+                wrapper.append(container, actions);
                 viewport.appendChild(wrapper);
 
                 if (page.type === 'pdf') page.render(bg);
                 setTimeout(() => { syncCanvasSize(int); redrawPage(page.id); initDrawing(int, page); }, 50);
             });
             lucide.createIcons();
-            syncSettingsUI();
-        }
-
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
-        function toggleSettings() { document.getElementById('settings-panel').classList.toggle('hidden'); }
-        
-        function setTool(tool) {
-            activeTool = tool;
-            document.querySelectorAll('#floating-toolbar button').forEach(b => b.classList.remove('tool-active'));
-            const btn = document.getElementById(`btn-${tool}`);
-            if(btn) btn.classList.add('tool-active');
+            startLaserLoop();
         }
 
         function syncCanvasSize(canvas) {
@@ -647,42 +843,480 @@
         function initDrawing(canvas, page) {
             const ctx = canvas.getContext('2d');
             let currentStroke = null;
+            
             const getPos = (e) => {
                 const r = canvas.getBoundingClientRect();
                 const c = (e.touches && e.touches[0]) ? e.touches[0] : e;
                 return { x: c.clientX - r.left, y: c.clientY - r.top };
             };
+
             const start = (e) => {
                 const pos = getPos(e);
+
+                if (activeTool === 'text') {
+                    // Check if clicking on existing text
+                    const hit = page.texts.findIndex(t => 
+                        pos.x >= t.x && pos.x <= t.x + t.width && pos.y >= t.y && pos.y <= t.y + t.height
+                    );
+                    if (hit !== -1) {
+                         // Edit Existing
+                         editText(page, hit, canvas);
+                    } else {
+                         // New Text
+                         createNewTextInput(pos.x, pos.y, page, canvas);
+                    }
+                    return;
+                }
+
+                if (activeTool === 'lasso') {
+                    if (lassoState.active && lassoState.pageId === page.id && isPointInRect(pos, lassoState.bounds)) {
+                        // Drag Start
+                        const b = lassoState.bounds;
+                        // Check resize corner (bottom-right)
+                        if (pos.x > b.x + b.w - 20 && pos.y > b.y + b.h - 20) lassoState.dragMode = 'resize';
+                        else lassoState.dragMode = 'move';
+                        
+                        lassoState.dragStart = pos;
+                        // Deep copy for transforms
+                        lassoState.original = {
+                            strokes: lassoState.selected.strokes.map(i => JSON.parse(JSON.stringify(page.strokes[i]))),
+                            texts: lassoState.selected.texts.map(i => ({...page.texts[i]})),
+                            images: lassoState.selected.images.map(i => ({...page.images[i]})),
+                            bounds: {...lassoState.bounds}
+                        };
+                        return;
+                    }
+                    clearLasso();
+                    lassoState.pageId = page.id;
+                    lassoState.points = [pos];
+                    return;
+                }
+
+                // Drawing & Laser
+                if (activeTool === 'laser') {
+                    page.laserTrail.push({ x: pos.x, y: pos.y, life: 1.0 });
+                    return;
+                }
+
                 currentStroke = { 
                     points: [pos], 
-                    color: activeTool === 'pen' ? '#3b82f6' : (activeTool === 'highlighter' ? '#eab308' : '#000000'), 
-                    width: activeTool === 'pen' ? 2 : (activeTool === 'highlighter' ? 15 : 25), 
-                    alpha: activeTool === 'highlighter' ? 0.3 : 1, 
+                    color: activeTool === 'pen' ? penSettings.color : (activeTool === 'highlighter' ? '#eab308' : '#000000'), 
+                    width: activeTool === 'pen' ? penSettings.width : (activeTool === 'highlighter' ? 15 : eraserSettings.width), 
+                    alpha: activeTool === 'pen' ? penSettings.alpha : (activeTool === 'highlighter' ? 0.3 : 1), 
                     mode: activeTool === 'eraser' ? 'destination-out' : 'source-over' 
                 };
                 ctx.beginPath(); ctx.strokeStyle = currentStroke.color; ctx.lineWidth = currentStroke.width; ctx.globalAlpha = currentStroke.alpha; ctx.globalCompositeOperation = currentStroke.mode; ctx.moveTo(pos.x, pos.y);
             };
-            const move = (e) => { if (!currentStroke) return; const pos = getPos(e); currentStroke.points.push(pos); ctx.lineTo(pos.x, pos.y); ctx.stroke(); };
-            const end = () => { if (currentStroke) { page.strokes.push(currentStroke); page.redoStack = []; currentStroke = null; } };
+
+            const move = (e) => {
+                const pos = getPos(e);
+                
+                if (activeTool === 'laser') {
+                    page.laserTrail.push({ x: pos.x, y: pos.y, life: 1.0 });
+                    return;
+                }
+
+                if (activeTool === 'lasso') {
+                    if (lassoState.dragMode) {
+                        handleLassoDrag(pos, page);
+                    } else if (lassoState.pageId === page.id && lassoState.points.length > 0) {
+                        lassoState.points.push(pos);
+                        redrawPage(page.id, true);
+                    }
+                    return;
+                }
+
+                if (!currentStroke) return; 
+                currentStroke.points.push(pos); 
+                ctx.lineTo(pos.x, pos.y); 
+                ctx.stroke();
+            };
+
+            const end = () => {
+                if (activeTool === 'lasso') {
+                    if (lassoState.dragMode) {
+                        lassoState.dragMode = null; lassoState.original = null; showLassoMenu();
+                    } else if (lassoState.points.length > 2) {
+                        finalizeLassoSelection(page, canvas.getContext('2d'));
+                    } else {
+                        clearLasso();
+                    }
+                    return;
+                }
+                if (currentStroke) { page.strokes.push(currentStroke); page.redoStack = []; currentStroke = null; }
+            };
+
             canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = end;
             canvas.ontouchstart = (e) => { e.preventDefault(); start(e); }; canvas.ontouchmove = (e) => { e.preventDefault(); move(e); }; canvas.ontouchend = end;
         }
 
-        function redrawPage(pageId) {
+        // --- Lasso Logic ---
+        function isPointInRect(p, r) { return r && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h; }
+        
+        function finalizeLassoSelection(page, ctx) {
+            const poly = lassoState.points;
+            const sel = { strokes: [], texts: [], images: [] };
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            let hasSelection = false;
+
+            // Check Strokes
+            page.strokes.forEach((s, i) => {
+                // Check if stroke roughly inside
+                const center = s.points[Math.floor(s.points.length/2)];
+                if(center && isPointInPoly(center, poly)) sel.strokes.push(i);
+            });
+
+            // Check Texts
+            page.texts.forEach((t, i) => {
+                if(isPointInPoly({x: t.x + t.width/2, y: t.y + t.height/2}, poly)) sel.texts.push(i);
+            });
+
+            // Check Images
+            page.images.forEach((img, i) => {
+                if(isPointInPoly({x: img.x + img.width/2, y: img.y + img.height/2}, poly)) sel.images.push(i);
+            });
+
+            if (sel.strokes.length + sel.texts.length + sel.images.length > 0) {
+                // Calculate Bounds
+                const expandBounds = (x, y, w, h) => {
+                    minX = Math.min(minX, x); maxX = Math.max(maxX, x + w);
+                    minY = Math.min(minY, y); maxY = Math.max(maxY, y + h);
+                };
+
+                sel.strokes.forEach(i => page.strokes[i].points.forEach(p => expandBounds(p.x, p.y, 0, 0)));
+                sel.texts.forEach(i => { const t = page.texts[i]; expandBounds(t.x, t.y, t.width, t.height); });
+                sel.images.forEach(i => { const img = page.images[i]; expandBounds(img.x, img.y, img.width, img.height); });
+
+                lassoState.active = true;
+                lassoState.selected = sel;
+                lassoState.bounds = { x: minX - 10, y: minY - 10, w: maxX - minX + 20, h: maxY - minY + 20 };
+                lassoState.points = [];
+                showLassoMenu();
+            } else {
+                clearLasso();
+            }
+            redrawPage(page.id, true);
+        }
+
+        function isPointInPoly(p, polygon) {
+            let isInside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                if ((polygon[i].y > p.y) !== (polygon[j].y > p.y) &&
+                    p.x < (polygon[j].x - polygon[i].x) * (p.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x) {
+                    isInside = !isInside;
+                }
+            }
+            return isInside;
+        }
+
+        function handleLassoDrag(pos, page) {
+            if (!lassoState.original) return;
+            const dx = pos.x - lassoState.dragStart.x;
+            const dy = pos.y - lassoState.dragStart.y;
+            const orig = lassoState.original;
+
+            if (lassoState.dragMode === 'move') {
+                lassoState.bounds.x = orig.bounds.x + dx;
+                lassoState.bounds.y = orig.bounds.y + dy;
+
+                lassoState.selected.strokes.forEach((idx, i) => {
+                    page.strokes[idx].points = orig.strokes[i].points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                });
+                lassoState.selected.texts.forEach((idx, i) => {
+                    page.texts[idx].x = orig.texts[i].x + dx;
+                    page.texts[idx].y = orig.texts[i].y + dy;
+                });
+                lassoState.selected.images.forEach((idx, i) => {
+                    page.images[idx].x = orig.images[i].x + dx;
+                    page.images[idx].y = orig.images[i].y + dy;
+                });
+
+            } else if (lassoState.dragMode === 'resize') {
+                const scaleX = (orig.bounds.w + dx) / orig.bounds.w;
+                const scaleY = (orig.bounds.h + dy) / orig.bounds.h;
+                
+                // Limit min size
+                if(orig.bounds.w * scaleX < 20 || orig.bounds.h * scaleY < 20) return;
+
+                lassoState.bounds.w = orig.bounds.w * scaleX;
+                lassoState.bounds.h = orig.bounds.h * scaleY;
+
+                // Scale Logic
+                const ox = orig.bounds.x, oy = orig.bounds.y;
+
+                lassoState.selected.strokes.forEach((idx, i) => {
+                    page.strokes[idx].points = orig.strokes[i].points.map(p => ({
+                        x: ox + (p.x - ox) * scaleX,
+                        y: oy + (p.y - oy) * scaleY
+                    }));
+                });
+                lassoState.selected.texts.forEach((idx, i) => {
+                    const t = orig.texts[i];
+                    page.texts[idx].x = ox + (t.x - ox) * scaleX;
+                    page.texts[idx].y = oy + (t.y - oy) * scaleY;
+                    page.texts[idx].fontSize = Math.max(8, t.fontSize * Math.min(scaleX, scaleY));
+                    // Re-measure width (approximate) needed to maintain bounds consistency
+                });
+                lassoState.selected.images.forEach((idx, i) => {
+                    const img = orig.images[i];
+                    page.images[idx].x = ox + (img.x - ox) * scaleX;
+                    page.images[idx].y = oy + (img.y - oy) * scaleY;
+                    page.images[idx].width = img.width * scaleX;
+                    page.images[idx].height = img.height * scaleY;
+                });
+            }
+            hideLassoMenu();
+            redrawPage(page.id, true);
+        }
+
+        // --- Text & Paste Logic ---
+        function createNewTextInput(x, y, page, canvas, existingText = null, index = -1) {
+            const input = document.createElement('textarea');
+            input.className = 'text-input-overlay';
+            input.style.left = canvas.parentElement.offsetLeft + (x / window.devicePixelRatio) + 'px';
+            input.style.top = canvas.parentElement.offsetTop + (y / window.devicePixelRatio) + 'px';
+            input.style.fontFamily = existingText ? existingText.font : textSettings.font;
+            input.style.fontSize = (existingText ? existingText.fontSize : textSettings.size) + 'px';
+            input.style.fontWeight = (existingText && existingText.bold) || textSettings.bold ? 'bold' : 'normal';
+            input.style.color = existingText ? existingText.color : textSettings.color;
+            input.value = existingText ? existingText.text : '';
+            
+            document.body.appendChild(input);
+            input.focus();
+
+            const save = () => {
+                if (input.value.trim()) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.font = `${input.style.fontWeight} ${input.style.fontSize} ${input.style.fontFamily}`;
+                    const metrics = ctx.measureText(input.value);
+                    const h = parseInt(input.style.fontSize) * 1.2; // approx line height
+                    
+                    const newObj = {
+                        x: x, y: y,
+                        text: input.value,
+                        font: input.style.fontFamily,
+                        fontSize: parseInt(input.style.fontSize),
+                        color: input.style.color,
+                        bold: input.style.fontWeight === 'bold',
+                        width: metrics.width,
+                        height: h
+                    };
+
+                    if(index !== -1) page.texts[index] = newObj;
+                    else page.texts.push(newObj);
+                } else if (index !== -1) {
+                    page.texts.splice(index, 1); // Delete if empty
+                }
+                document.body.removeChild(input);
+                redrawPage(page.id);
+            };
+
+            input.onblur = save;
+            input.onkeydown = (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); }};
+        }
+
+        function editText(page, index, canvas) {
+            const t = page.texts[index];
+            createNewTextInput(t.x, t.y, page, canvas, t, index);
+        }
+
+        // Paste Handler
+        window.addEventListener('paste', async (e) => {
+            const items = e.clipboardData.items;
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages[0]; // Default to first page if no context, or find active viewport
+            
+            // Heuristic to find visible page
+            // For simplicity, pasting to the first visible page in viewport would be ideal, 
+            // but we'll default to the first page or the last edited page.
+            // Let's use the page currently under the toolbar or center of screen?
+            // Simplified: Paste to Page 1 center
+            
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            page.images.push({
+                                x: 100, y: 100,
+                                width: 200, height: 200 * (img.height / img.width),
+                                data: img
+                            });
+                            redrawPage(page.id);
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                } else if (item.type.indexOf('text/plain') !== -1) {
+                    item.getAsString((text) => {
+                        if(text) {
+                            page.texts.push({
+                                x: 100, y: 100,
+                                text: text,
+                                font: textSettings.font,
+                                fontSize: textSettings.size,
+                                color: textSettings.color,
+                                bold: false,
+                                width: text.length * 10, // Approx
+                                height: textSettings.size * 1.2
+                            });
+                            redrawPage(page.id);
+                        }
+                    });
+                }
+            }
+        });
+
+        // --- Lasso Menu & Operations ---
+        function showLassoMenu() {
+            const menu = document.getElementById('lasso-menu');
+            const canvas = document.querySelector(`#int-${lassoState.pageId}`);
+            if (!canvas || !lassoState.bounds) return;
+            const rect = canvas.getBoundingClientRect();
+            menu.style.top = `${rect.top + lassoState.bounds.y}px`;
+            menu.style.left = `${rect.left + lassoState.bounds.x + lassoState.bounds.w/2}px`;
+            menu.style.display = 'flex';
+        }
+        function hideLassoMenu() { document.getElementById('lasso-menu').style.display = 'none'; }
+        function clearLasso() {
+            hideLassoMenu();
+            const pid = lassoState.pageId;
+            lassoState = { active: false, points: [], selected: {strokes:[], texts:[], images:[]}, bounds: null, pageId: null, dragStart: null, dragMode: null, original: null };
+            if(pid) redrawPage(pid);
+        }
+        function lassoChangeColor(color) {
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages.find(p => p.id === lassoState.pageId);
+            lassoState.selected.strokes.forEach(i => page.strokes[i].color = color);
+            lassoState.selected.texts.forEach(i => page.texts[i].color = color);
+            redrawPage(lassoState.pageId, true);
+        }
+        function lassoDelete() {
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages.find(p => p.id === lassoState.pageId);
+            // Sort desc to delete
+            [...lassoState.selected.strokes].sort((a,b)=>b-a).forEach(i => page.strokes.splice(i,1));
+            [...lassoState.selected.texts].sort((a,b)=>b-a).forEach(i => page.texts.splice(i,1));
+            [...lassoState.selected.images].sort((a,b)=>b-a).forEach(i => page.images.splice(i,1));
+            clearLasso();
+        }
+        function lassoCopy() {
+            const doc = documents.find(d => d.id === activeDocId);
+            const page = doc.pages.find(p => p.id === lassoState.pageId);
+            const sel = lassoState.selected;
+            
+            const newStrokes = [], newTexts = [], newImages = [];
+            
+            sel.strokes.forEach(i => {
+                const copy = JSON.parse(JSON.stringify(page.strokes[i]));
+                copy.points.forEach(p => { p.x += 20; p.y += 20; });
+                page.strokes.push(copy);
+                newStrokes.push(page.strokes.length - 1);
+            });
+            sel.texts.forEach(i => {
+                const copy = {...page.texts[i]};
+                copy.x += 20; copy.y += 20;
+                page.texts.push(copy);
+                newTexts.push(page.texts.length - 1);
+            });
+             sel.images.forEach(i => {
+                const copy = {...page.images[i]};
+                copy.x += 20; copy.y += 20;
+                page.images.push(copy);
+                newImages.push(page.images.length - 1);
+            });
+
+            lassoState.selected = { strokes: newStrokes, texts: newTexts, images: newImages };
+            lassoState.bounds.x += 20; lassoState.bounds.y += 20;
+            redrawPage(lassoState.pageId, true);
+            showLassoMenu();
+        }
+
+        // --- Rendering Loop ---
+        function redrawPage(pageId, showOverlay = false) {
             const canvas = document.querySelector(`#int-${pageId}`);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             const doc = documents.find(d => d.id === activeDocId);
             const page = doc.pages.find(p => p.id === pageId);
             const dpr = window.devicePixelRatio || 1;
+            
             ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            
+            // Draw Images
+            page.images.forEach(img => {
+                if(img.data) ctx.drawImage(img.data, img.x, img.y, img.width, img.height);
+            });
+
+            // Draw Text
+            page.texts.forEach(t => {
+                ctx.font = `${t.bold ? 'bold' : 'normal'} ${t.fontSize}px ${t.font}`;
+                ctx.fillStyle = t.color;
+                ctx.fillText(t.text, t.x, t.y + t.fontSize); // Baseline adjustment
+            });
+
+            // Draw Strokes
             page.strokes.forEach(s => {
                 ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.globalAlpha = s.alpha; ctx.globalCompositeOperation = s.mode;
-                s.points.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }); ctx.stroke();
+                s.points.forEach((p, j) => { if (j === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }); ctx.stroke();
             });
+
+            // Draw Laser
+            if (page.laserTrail.length > 0) {
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.shadowBlur = 10; ctx.shadowColor = 'red';
+                for (let i = 1; i < page.laserTrail.length; i++) {
+                    const p1 = page.laserTrail[i-1];
+                    const p2 = page.laserTrail[i];
+                    if (p1.life > 0 && p2.life > 0) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(255, 0, 0, ${p2.life})`;
+                        ctx.lineWidth = 4;
+                        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+                    }
+                }
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw Lasso Overlay
+            if (activeTool === 'lasso' && lassoState.pageId === pageId) {
+                ctx.save();
+                if (lassoState.points.length > 0 && !lassoState.active) {
+                    ctx.beginPath(); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+                    lassoState.points.forEach((p, i) => { if (i===0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+                    ctx.stroke();
+                }
+                if (lassoState.active && lassoState.bounds) {
+                    const b = lassoState.bounds;
+                    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(b.x, b.y, b.w, b.h);
+                    ctx.setLineDash([]); ctx.fillStyle = 'white';
+                    ctx.fillRect(b.x + b.w - 8, b.y + b.h - 8, 8, 8); ctx.strokeRect(b.x + b.w - 8, b.y + b.h - 8, 8, 8);
+                }
+                ctx.restore();
+            }
         }
 
+        // Laser Loop
+        function startLaserLoop() {
+            const loop = () => {
+                let needsRedraw = false;
+                documents.forEach(doc => doc.pages.forEach(page => {
+                    if (page.laserTrail.length > 0) {
+                        needsRedraw = true;
+                        // Fade out - Adjusted to 0.01 for slower fade (user request)
+                        page.laserTrail.forEach(p => p.life -= 0.01);
+                        page.laserTrail = page.laserTrail.filter(p => p.life > 0);
+                        redrawPage(page.id, activeTool === 'lasso');
+                    }
+                }));
+                requestAnimationFrame(loop);
+            };
+            loop();
+        }
+
+        // --- Helper Functions (Same as before) ---
         function undo() { 
             const doc = documents.find(d => d.id === activeDocId);
             doc.pages.forEach(p => { if (p.strokes.length) { p.redoStack.push(p.strokes.pop()); redrawPage(p.id); } });
@@ -691,27 +1325,37 @@
             const doc = documents.find(d => d.id === activeDocId);
             doc.pages.forEach(p => { if (p.redoStack.length) { p.strokes.push(p.redoStack.pop()); redrawPage(p.id); } });
         }
-
         function createNewProject() {
             const id = 'doc_' + Date.now();
-            documents.push({ id, title: 'Project ' + (documents.length + 1), pages: [{ id: 'p_' + Date.now(), type: 'blank', strokes: [], redoStack: [] }] });
+            documents.push({ 
+                id, 
+                title: 'Project ' + (documents.length + 1), 
+                watermark: { type: 'none', text: 'DRAFT', imageSrc: null, color: '#ef4444', opacity: 0.2, size: 50, rotation: -45 },
+                pages: [{ id: 'p_' + Date.now(), type: 'blank', strokes: [], texts: [], images: [], laserTrail: [], redoStack: [] }] 
+            });
             activeDocId = id; render();
         }
-
         function addBlankPage(idx) {
             const doc = documents.find(d => d.id === activeDocId);
-            const newPage = { id: 'p_' + Date.now(), type: 'blank', strokes: [], redoStack: [] };
-            if (idx !== undefined) doc.pages.splice(idx + 1, 0, newPage);
-            else doc.pages.push(newPage);
+            const newPage = { id: 'p_' + Date.now(), type: 'blank', strokes: [], texts: [], images: [], laserTrail: [], redoStack: [] };
+            if (idx !== undefined) doc.pages.splice(idx + 1, 0, newPage); else doc.pages.push(newPage);
             render();
+        }
+        
+        // Triggers the hidden file input
+        function triggerPdfUpload(idx) {
+            uploadTargetIndex = idx; // If undefined, will append to end
+            document.getElementById('pdf-upload-input').click();
         }
 
         function deletePage(idx) {
             const doc = documents.find(d => d.id === activeDocId);
             if (doc.pages.length > 1) { doc.pages.splice(idx, 1); render(); }
         }
+        async function handleFileUpload(e) {
+            const insertIdx = uploadTargetIndex;
+            uploadTargetIndex = null; // Reset for next time
 
-        async function handleFileUpload(e, insertIdx) {
             const file = e.target.files[0];
             if (!file) return;
             document.getElementById('loader').classList.remove('hidden');
@@ -723,10 +1367,7 @@
                     const page = await pdf.getPage(i);
                     const viewport = page.getViewport({ scale: 2 });
                     newPages.push({ 
-                        id: `pdf_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 5)}`, 
-                        type: 'pdf', 
-                        strokes: [], 
-                        redoStack: [], 
+                        id: `pdf_${Date.now()}_${i}`, type: 'pdf', strokes: [], texts: [], images: [], laserTrail: [], redoStack: [],
                         render: async (c) => {
                             const ctx = c.getContext('2d');
                             c.width = viewport.width; c.height = viewport.height;
@@ -734,13 +1375,17 @@
                         }
                     });
                 }
-                if (insertIdx !== undefined) doc.pages.splice(insertIdx + 1, 0, ...newPages);
-                else doc.pages.push(...newPages);
+                if (insertIdx !== undefined && insertIdx !== null) {
+                     doc.pages.splice(insertIdx + 1, 0, ...newPages); 
+                } else {
+                     doc.pages.push(...newPages);
+                }
             } catch(err) { console.error(err); }
+            // Reset input so same file can be selected again if needed
+            e.target.value = '';
             document.getElementById('loader').classList.add('hidden');
             render();
         }
-
         async function exportPdf() {
             document.getElementById('loader').classList.remove('hidden');
             const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
